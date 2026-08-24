@@ -14,6 +14,7 @@ MainWindow::MainWindow(Monitor *monitor,QWidget *parent)
     button2->setText("测试");
     connect(button2,&QPushButton::clicked,this,[this](){
         test=new Test();
+        delete test;
     });
 
     mainlayout=new QVBoxLayout(this);
@@ -22,5 +23,4 @@ MainWindow::MainWindow(Monitor *monitor,QWidget *parent)
 };
 
 MainWindow::~MainWindow(){
-    delete test;
 }

@@ -59,6 +59,12 @@ qt_add_executable(EasyTrain
 
 )
 
+# libtorch 2.13 头文件用了 __VA_OPT__ 等 C++20 变参宏，MSVC 传统预处理器展开会错位，
+# 报 C2059/C2334（ivalue_inl.h）。必须开符合标准的预处理器 /Zc:preprocessor。
+if(MSVC)
+    target_compile_options(EasyTrain PRIVATE /Zc:preprocessor)
+endif()
+
 target_link_libraries(EasyTrain
     PRIVATE
         Qt::Core

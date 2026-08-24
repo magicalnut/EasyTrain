@@ -8,7 +8,8 @@
 #include <vector>
 
 // 随机数据最小训练：验证 loss 下降 + 设备切换 + train/eval 机制
-std::vector<float> train_for_demo(DAGModel& model, int steps = 200, int batch = 32) {
+// 定义在头文件里、被多个 .cpp include，必须 inline，否则 LNK2005（每个 TU 各一份定义）。
+inline std::vector<float> train_for_demo(DAGModel& model, int steps = 200, int batch = 32) {
     torch::Device dev = torch::cuda::is_available()
     ? torch::Device(torch::kCUDA, 0) : torch::Device(torch::kCPU);
     model.to(dev);
