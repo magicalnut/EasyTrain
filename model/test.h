@@ -19,10 +19,11 @@ inline std::vector<float> train_for_demo(DAGModel& model, int steps = 200, int b
     torch::nn::CrossEntropyLoss loss_fn;
 
     std::vector<float> losses;
+    auto x = torch::randn({batch, 3, 32, 32}, torch::TensorOptions().device(dev));
+    auto y = torch::randint(0, 10, {batch},
+                            torch::TensorOptions().dtype(torch::kLong).device(dev));  // 标签必须 kLong
     for (int s = 0; s < steps; ++s) {
-        auto x = torch::randn({batch, 3, 32, 32}, torch::TensorOptions().device(dev));
-        auto y = torch::randint(0, 10, {batch},
-                                torch::TensorOptions().dtype(torch::kLong).device(dev));  // 标签必须 kLong
+
         opt.zero_grad();
         auto loss = loss_fn(model.forward(x), y);
         loss.backward();

@@ -7,6 +7,7 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QCloseEvent>
 
 // Qt 的 qobjectdefs.h 把 `slots` 定义成空宏（#define slots），会和 libtorch 的
 // Object::slots() 撞名：ivalue_inl.h:1585 的 `...& slots() const {` 被预处理成
@@ -20,7 +21,7 @@ class MainWindow : public QWidget
 {
     Q_OBJECT
 public:
-    MainWindow(Monitor *monitor,QWidget *parent = nullptr);
+    MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 private:
     Monitor *monitor;
@@ -32,7 +33,8 @@ private:
 
     Test *test;
 
-signals:
+protected:
+    void closeEvent(QCloseEvent *event);
 };
 
 #endif // MAINWINDOW_H

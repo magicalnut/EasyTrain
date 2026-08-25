@@ -1,9 +1,10 @@
 #include "mainwindow.h"
 
-MainWindow::MainWindow(Monitor *monitor,QWidget *parent)
-    : QWidget{parent},monitor(monitor)
+MainWindow::MainWindow(QWidget *parent)
+    : QWidget{parent}
 {
     this->resize(600,600);
+    monitor=new Monitor();
 
     button1=new QPushButton(this);
     button1->setText("资源监视器");
@@ -23,4 +24,10 @@ MainWindow::MainWindow(Monitor *monitor,QWidget *parent)
 };
 
 MainWindow::~MainWindow(){
+    monitor->deleteLater();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event){
+    monitor->close();
+    event->accept();
 }
