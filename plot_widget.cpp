@@ -2,8 +2,9 @@
 
 #include <QPainter>
 
-Plot_Widget::Plot_Widget(int times,QWidget *parent)
-    : QWidget{parent},maxx(times)
+Plot_Widget::Plot_Widget(int times, QWidget *parent, double ymax, double ymin)
+    : QWidget{parent}, maxx(times), maxy(ymax), miny(ymin),
+    maxy_floor(ymax), miny_floor(ymin)
 {
     // label=new QLabel(this);
     // label->setScaledContents(true);
@@ -106,8 +107,9 @@ void Plot_Widget::add_point(double p){
         miny=miny<*it?miny:*it;
         it++;
     }
-    maxy=100>maxy?100:maxy;
-    miny=0<miny?0:miny;
+    maxy = maxy_floor > maxy ? maxy_floor : maxy;
+    miny = miny_floor < miny ? miny_floor : miny;
+    if (maxy <= miny) maxy = miny + 1.0;
 
     update();
 }

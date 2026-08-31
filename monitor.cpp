@@ -195,15 +195,15 @@ Monitor::Monitor(QWidget *parent)
     connect(timer,&QTimer::timeout,monitor_cpu,&Monitor_cpu::do_work);
     connect(timer,&QTimer::timeout,monitor_memory_cpu,&Monitor_memory_cpu::do_work);
     connect(timer,&QTimer::timeout,monitor_gpu,&Monitor_gpu::do_work);
-    connect(monitor_cpu,&Worker::done,[this,monitor_cpu](){
+    connect(monitor_cpu,&Worker::done,this,[this,monitor_cpu](){
         label_cpu->setText(monitor_cpu->to_QString());
         cpu_plot->add_point(QString(monitor_cpu->res2.c_str()).toDouble());
     });
-    connect(monitor_memory_cpu,&Worker::done,[this,monitor_memory_cpu](){
+    connect(monitor_memory_cpu,&Worker::done,this,[this,monitor_memory_cpu](){
         label_memory_cpu->setText(monitor_memory_cpu->to_QString());
         memory_cpu_plot->add_point(QString(monitor_memory_cpu->res2.c_str()).toDouble());
     });
-    connect(monitor_gpu,&Worker::done,[this,monitor_gpu](){
+    connect(monitor_gpu,&Worker::done,this,[this,monitor_gpu](){
         std::pair<QString,QString>temp=monitor_gpu->to_QString();
         label_gpu->setText(temp.first);
         label_memory_gpu->setText(temp.second);

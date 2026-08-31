@@ -14,15 +14,17 @@ class Plot_Widget : public QWidget
 {
     Q_OBJECT
 public:
-    Plot_Widget(int times,QWidget *parent = nullptr);
+    Plot_Widget(int times, QWidget *parent = nullptr, double ymax = 100, double ymin = 0);
     ~Plot_Widget();
     void add_point(double p);
 private:
     // QVBoxLayout *layout;
     // cv::Mat image;
     int maxx;
-    double maxy=100;
-    double miny=0;
+    double maxy;
+    double miny;
+    double maxy_floor;
+    double miny_floor;
     std::list<double>*y;
     double itemx;
     double itemy;

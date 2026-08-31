@@ -53,8 +53,12 @@ qt_add_executable(EasyTrain
     model/shape.cpp
     model/layer_factory.h
     model/layer_factory.cpp
-    model/dag_model.h
-    model/test.h model/test.cpp
+    model/model.h model/model.cpp
+    model/model_json.h model/model_json.cpp
+    model/dataset.h model/dataset.cpp
+    trainingworker.h trainingworker.cpp
+
+
 
 
 )
