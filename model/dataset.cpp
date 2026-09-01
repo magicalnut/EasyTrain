@@ -75,7 +75,8 @@ torch::Tensor to_tensor(const cv::Mat& img, int C, int H, int W) {
 
 }
 
-Dataset load_dataset(const std::string& src, int C, int H, int W, bool is_csv) {
+Dataset load_dataset(const std::wstring& src, int C, int H, int W, bool is_csv) {
+    fs::path root(src);
     std::vector<torch::Tensor> xs;
     std::vector<int64_t> ys;
     int64_t nclasses = 0;
@@ -83,7 +84,7 @@ Dataset load_dataset(const std::string& src, int C, int H, int W, bool is_csv) {
     if (!is_csv) {
         // 文件夹：每个子目录一个类，目录名按字典序编号 0..C-1
         std::vector<fs::path> class_dirs;
-        for (const auto& e : fs::directory_iterator(src)){
+        for (const auto& e : fs::directory_iterator(root)){
             if (e.is_directory()) {
                 class_dirs.push_back(e.path());
             }
@@ -110,11 +111,11 @@ Dataset load_dataset(const std::string& src, int C, int H, int W, bool is_csv) {
     }
     else {
         // CSV：每行 path,label；整数当类索引，字符串按出现顺序映射
-        std::ifstream in(src);
+        std::ifstream in(root);
         if (!in) {
-            throw std::runtime_error("打开 CSV 失败: " + src);
+            throw std::runtime_error("打开 CSV 失败: " + root.string());
         }
-        fs::path csv_dir = fs::path(src).parent_path();
+        fs::path csv_dir = root.parent_path();
         std::map<std::string, int64_t> str2idx;
         std::string line;
         while (std::getline(in, line)) {
