@@ -29,6 +29,9 @@ public:
     explicit Model(const Shape& input);
     ~Model();
 
+    void prepareTraining();
+    float trainBatch(const torch::Tensor& xb, const torch::Tensor& yb,torch::nn::CrossEntropyLoss& loss_fn);
+
     // —— 结构——
     void setInputShape(const Shape& input);          // 输入契约 [N,C,H,W]，N 可 -1
     void addLayer(const LayerConfig& layer);         // 追加一层，只记配置，不立刻建
@@ -44,7 +47,7 @@ public:
     torch::Tensor forward(torch::Tensor x);           // 未 build 则先 build
 
     // —— 训练 ——
-    float fit(const torch::Tensor& x, const torch::Tensor& y, int batch = 32,const std::atomic<bool>* stop = nullptr); // 一个 epoch，返回平均 loss
+    //float fit(const torch::Tensor& x, const torch::Tensor& y, int batch = 32,const std::atomic<bool>* stop = nullptr); // 一个 epoch，返回平均 loss
     void setOptimizer(const OptimizerConfig& cfg);    // 训练前设置/换优化器（只重置 optimizer_，不重建模块）
     void setLearningRate(double lr);                  // 训练中可改，下个 epoch 生效
     double learningRate() const;

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <random>
 #include <stdexcept>
 #include <vector>
 
@@ -73,16 +74,47 @@ torch::Tensor to_tensor(const cv::Mat& img, int C, int H, int W) {
     return t;
 }
 
+thread_local std::mt19937 g_rng(std::random_device{}());
+
+// 随机增广 + resize 到 (W,H)。train=false 只 resize。
+cv::Mat augment(const cv::Mat& img, const AugConfig& aug, int H, int W, bool train) {
+    cv::Mat m = img;
+    if (train) {
+        if (aug.random_crop) {
+            int pad = std::max(1, H / 8);
+            cv::copyMakeBorder(m, m, pad, pad, pad, pad, cv::BORDER_REFLECT);
+            std::uniform_int_distribution<int> d(0, 2 * pad);
+            int x = d(g_rng), y = d(g_rng);
+            m = m(cv::Rect(x, y, img.cols, img.rows)).clone();
+        }
+        if (aug.hflip) {
+            std::uniform_int_distribution<int> d(0, 1);
+            if (d(g_rng)) cv::flip(m, m, 1);
+        }
+        if (aug.rotate_deg > 0) {
+            std::uniform_real_distribution<double> d(-aug.rotate_deg, aug.rotate_deg);
+            double ang = d(g_rng);
+            cv::Mat R = cv::getRotationMatrix2D(cv::Point2f(m.cols / 2.f, m.rows / 2.f), ang, 1.0);
+            cv::warpAffine(m, m, R, m.size(), cv::INTER_LINEAR, cv::BORDER_REFLECT);
+        }
+        if (aug.brightness > 0 && m.channels() == 3) {
+            std::uniform_real_distribution<double> d(1.0 - aug.brightness, 1.0 + aug.brightness);
+            m.convertTo(m, -1, d(g_rng), 0);
+        }
+    }
+    cv::resize(m, m, cv::Size(W, H));
+    return m;
 }
 
-Dataset load_dataset(const std::wstring& src, int C, int H, int W, bool is_csv) {
+}
+
+Dataset load_dataset(const std::wstring& src, bool is_csv) {
     fs::path root(src);
-    std::vector<torch::Tensor> xs;
-    std::vector<int64_t> ys;
+    std::vector<std::wstring> paths;
+    std::vector<int64_t> labels;
     int64_t nclasses = 0;
 
     if (!is_csv) {
-        // 文件夹：每个子目录一个类，目录名按字典序编号 0..C-1
         std::vector<fs::path> class_dirs;
         for (const auto& e : fs::directory_iterator(root)){
             if (e.is_directory()) {
@@ -104,13 +136,12 @@ Dataset load_dataset(const std::wstring& src, int C, int H, int W, bool is_csv) 
             }
             std::sort(files.begin(), files.end());
             for (const auto& f : files) {
-                xs.push_back(to_tensor(read_image(f), C, H, W));
-                ys.push_back(c);
+                paths.push_back(f.wstring());
+                labels.push_back(c);
             }
         }
     }
     else {
-        // CSV：每行 path,label；整数当类索引，字符串按出现顺序映射
         std::ifstream in(root);
         if (!in) {
             throw std::runtime_error("打开 CSV 失败: " + root.string());
@@ -134,11 +165,11 @@ Dataset load_dataset(const std::wstring& src, int C, int H, int W, bool is_csv) 
 
             fs::path img_path(path);
             if (img_path.is_relative()) {
-                img_path = csv_dir / img_path;   // 相对路径相对 CSV 所在目录
+                img_path = csv_dir / img_path;
             }
 
             int64_t idx;
-            bool numeric = std::all_of(label.begin(), label.end(),[](unsigned char c){
+            bool numeric = std::all_of(label.begin(), label.end(), [](unsigned char c){
                 return std::isdigit(c) || c == '-';
             });
             if (numeric) {
@@ -154,26 +185,59 @@ Dataset load_dataset(const std::wstring& src, int C, int H, int W, bool is_csv) 
                     idx = it->second;
                 }
             }
-            xs.push_back(to_tensor(read_image(img_path), C, H, W));
-            ys.push_back(idx);
+            paths.push_back(img_path.wstring());
+            labels.push_back(idx);
         }
         nclasses = 0;
-        for (auto y : ys) {
+        for (auto y : labels) {
             nclasses = std::max(nclasses, y + 1);
         }
     }
 
-    if (xs.empty()){
+    if (paths.empty()) {
         throw std::runtime_error("数据集为空");
     }
-
-    auto x = torch::stack(xs, 0);   // [N,C,H,W]
-    auto y = torch::tensor(ys, torch::TensorOptions().dtype(torch::kLong));
-    return Dataset{x, y, nclasses};
+    return Dataset{std::move(paths), std::move(labels), nclasses};
 }
 
-Dataset random_dataset(int N, int C, int H, int W, int classes) {
-    auto x = torch::randn({N, C, H, W});
-    auto y = torch::randint(0, classes, {N}, torch::TensorOptions().dtype(torch::kLong));
-    return Dataset{x, y, classes};
+Dataset random_dataset(const std::wstring& out_dir, int N, int C, int H, int W, int classes) {
+    fs::path root(out_dir);
+    fs::create_directories(root);
+    for (int c = 0; c < classes; ++c){
+        fs::create_directories(root / ("class" + std::to_string(c)));
+    }
+
+    for (int i = 0; i < N; ++i) {
+        int c = i % classes;
+        cv::Mat m(H, W, (C == 1 ? CV_8UC1 : CV_8UC3));
+        cv::randu(m, 0, 255);
+        fs::path p = root / ("class" + std::to_string(c)) / (std::to_string(i) + ".bmp");
+        cv::imwrite(p.string(), m);
+    }
+    return load_dataset(out_dir, false);// 复用文件夹加载，返回懒 Dataset
+}
+
+torch::Tensor sample_at(const Dataset& d, size_t i, int C, int H, int W,const AugConfig& aug, bool train) {
+    cv::Mat img = read_image(fs::path(d.paths_[i]));// BGR
+
+    cv::Mat m;
+    if (C == 1){
+        cv::cvtColor(img, m, cv::COLOR_BGR2GRAY);
+    }
+    else if (C == 3){
+        m = img;
+    }
+    else{
+        throw std::runtime_error("不支持的通道数 C（只支持 1 或 3）");
+    }
+
+    m = augment(m, aug, H, W, train);
+    m.convertTo(m, CV_32F, 1.0 / 255.0);
+
+    if (C == 1) {
+        auto t = torch::from_blob(m.data, {H, W}, torch::kFloat32);
+        return t.unsqueeze(0).clone();// [1,H,W]；clone：from_blob 不拥有数据
+    }
+    auto t = torch::from_blob(m.data, {H, W, 3}, torch::kFloat32);
+    return t.permute({2, 0, 1}).clone();// [3,H,W]
 }

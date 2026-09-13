@@ -348,6 +348,9 @@ MainWindow::MainWindow(QWidget *parent)
 };
 
 MainWindow::~MainWindow(){
+    if (!randomDir_.isEmpty()){
+        QDir(randomDir_).removeRecursively();
+    }
     monitor->deleteLater();
 }
 
@@ -681,8 +684,8 @@ void MainWindow::onLoadDataset() {
     auto s = json_["input_shape"].toArray();   // C/H/W 取「输入」页当前值
     int C = s[1].toInt(), H = s[2].toInt(), W = s[3].toInt();
     try {
-        dataset_ = load_dataset(src.toStdWString(), C, H, W, is_csv);
-        datasetLabel->setText(QString("已加载 %1 样本 / %2 类").arg(dataset_.x.size(0)).arg(dataset_.classes));
+        dataset_ = load_dataset(src.toStdWString(), is_csv);
+        datasetLabel->setText(QString("已加载 %1 样本 / %2 类").arg(dataset_.size()).arg(dataset_.classes));
     } catch (const std::exception& e) {
         QMessageBox::critical(this, "错误", e.what());
     }
@@ -691,8 +694,20 @@ void MainWindow::onLoadDataset() {
 void MainWindow::onRandomData() {
     auto s = json_["input_shape"].toArray();
     int C = s[1].toInt(), H = s[2].toInt(), W = s[3].toInt();
-    dataset_ = random_dataset(256, C, H, W, 10);   // 10 类：模型的最后一个 linear 要 out_features=10
-    datasetLabel->setText(QString("随机数据 %1 样本 / 10 类").arg(dataset_.x.size(0)));
+
+    if (!randomDir_.isEmpty()){
+        QDir(randomDir_).removeRecursively();
+    }
+    QString dir = QDir::tempPath() + "/EasyTrain_rand_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QDir().mkpath(dir);
+
+    try {
+        dataset_ = random_dataset(dir.toStdWString(), 256, C, H, W, 10);
+        randomDir_ = dir;
+        datasetLabel->setText(QString("随机数据 %1 样本 / 10 类").arg(dataset_.size()));
+    } catch (const std::exception& e) {
+        QMessageBox::critical(this, "错误", e.what());
+    }
 }
 
 void MainWindow::onDeviceChanged(int) {
@@ -744,7 +759,7 @@ void MainWindow::onLoadWeights() {
 }
 
 bool MainWindow::ensureDatasetReady() {
-    if (!dataset_.x.defined()) {
+    if (dataset_.paths_.empty()) {
         QMessageBox::warning(this, "提示", "请先加载数据集（或生成随机数据）");
         return false;
     }
@@ -764,7 +779,10 @@ void MainWindow::onStart() {
         return;
     }
 
-    worker = new TrainingWorker(&model_, dataset_.x, dataset_.y,currentDevice(), batchSpin->value(), epochSpin->value());
+    auto s = json_["input_shape"].toArray();
+    int C = s[1].toInt(), H = s[2].toInt(), W = s[3].toInt();
+
+    worker = new TrainingWorker(&model_, &dataset_, C, H, W, aug_, currentDevice(),batchSpin->value(), epochSpin->value());
     thread = new QThread(this);
     worker->moveToThread(thread);
 

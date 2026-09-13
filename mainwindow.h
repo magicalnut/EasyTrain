@@ -149,6 +149,9 @@ private:
     void onEpochDone(int epoch);
     void onTrainingFinished();
 
+    QString randomDir_;   // 随机数据临时目录
+    AugConfig aug_;
+
 protected:
     void closeEvent(QCloseEvent *event);
 };

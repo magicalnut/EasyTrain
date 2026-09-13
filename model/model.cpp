@@ -108,42 +108,42 @@ void Model::applyLearningRate() {
         g.options().set_lr(lr);   // OptimizerOptions 有虚 set_lr，各优化器已 override，无需 downcast
 }
 
-float Model::fit(const torch::Tensor& x, const torch::Tensor& y, int batch,const std::atomic<bool>* stop) {
-    ensureBuilt();
-    ensureOptimizer();
-    applyLearningRate();                 // 训练中改 lr → 下个 epoch 生效
-    impl_->train();
+// float Model::fit(const torch::Tensor& x, const torch::Tensor& y, int batch,const std::atomic<bool>* stop) {
+//     ensureBuilt();
+//     ensureOptimizer();
+//     applyLearningRate();                 // 训练中改 lr → 下个 epoch 生效
+//     impl_->train();
 
-    int64_t n = x.size(0);
-    if (n <= 0) return 0.0f;
-    if (y.size(0) != n) throw std::runtime_error("fit: x/y 样本数不一致");
-    if (batch <= 0) batch = 32;
+//     int64_t n = x.size(0);
+//     if (n <= 0) return 0.0f;
+//     if (y.size(0) != n) throw std::runtime_error("fit: x/y 样本数不一致");
+//     if (batch <= 0) batch = 32;
 
-    torch::nn::CrossEntropyLoss loss_fn;
+//     torch::nn::CrossEntropyLoss loss_fn;
 
-    // 洗牌（索引放到 x 同设备，避免 device mismatch）
-    auto perm = torch::randperm(n, torch::TensorOptions().dtype(torch::kLong).device(x.device()));
-    auto xs = x.index_select(0, perm);
-    auto ys = y.index_select(0, perm);
+//     // 洗牌（索引放到 x 同设备，避免 device mismatch）
+//     auto perm = torch::randperm(n, torch::TensorOptions().dtype(torch::kLong).device(x.device()));
+//     auto xs = x.index_select(0, perm);
+//     auto ys = y.index_select(0, perm);
 
-    double total = 0.0;
-    int64_t seen = 0;
-    for (int64_t i = 0; i < n; i += batch) {
-        if (stop && stop->load()) break;   // 急停
-        int64_t e = std::min<int64_t>(i + batch, n);
-        auto xb = xs.slice(0, i, e);
-        auto yb = ys.slice(0, i, e);
+//     double total = 0.0;
+//     int64_t seen = 0;
+//     for (int64_t i = 0; i < n; i += batch) {
+//         if (stop && stop->load()) break;   // 急停
+//         int64_t e = std::min<int64_t>(i + batch, n);
+//         auto xb = xs.slice(0, i, e);
+//         auto yb = ys.slice(0, i, e);
 
-        optimizer_->zero_grad();
-        auto loss = loss_fn(impl_->forward(xb), yb);
-        loss.backward();
-        optimizer_->step();
+//         optimizer_->zero_grad();
+//         auto loss = loss_fn(impl_->forward(xb), yb);
+//         loss.backward();
+//         optimizer_->step();
 
-        total += loss.item().toFloat() * (e - i);   // item<float>() 已废弃，用 item().toFloat()
-        seen += (e - i);
-    }
-    return static_cast<float>(total / seen);
-}
+//         total += loss.item().toFloat() * (e - i);   // item<float>() 已废弃，用 item().toFloat()
+//         seen += (e - i);
+//     }
+//     return static_cast<float>(total / seen);
+// }
 
 void Model::setOptimizer(const OptimizerConfig& cfg) {
     opt_cfg_ = cfg;
@@ -174,4 +174,19 @@ void Model::saveWeights(const std::string& path) const {
 void Model::loadWeights(const std::string& path) {
     if (!impl_) throw std::runtime_error("loadWeights: 模型尚未 build");
     torch::load(impl_, path);            // 要求当前结构与保存时一致，否则 key 不匹配 throw
+}
+
+void Model::prepareTraining() {
+    ensureBuilt();
+    ensureOptimizer();
+    applyLearningRate();
+    impl_->train();
+}
+
+float Model::trainBatch(const torch::Tensor& xb, const torch::Tensor& yb,torch::nn::CrossEntropyLoss& loss_fn) {
+    optimizer_->zero_grad();
+    auto loss = loss_fn(impl_->forward(xb), yb);
+    loss.backward();
+    optimizer_->step();
+    return loss.item().toFloat();
 }
