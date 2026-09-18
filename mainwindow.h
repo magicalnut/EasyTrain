@@ -152,6 +152,8 @@ private:
     QString randomDir_;   // 随机数据临时目录
     AugConfig aug_;
 
+    int trainedEpochs_ = 0;
+
 protected:
     void closeEvent(QCloseEvent *event);
 };

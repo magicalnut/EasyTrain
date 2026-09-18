@@ -291,7 +291,7 @@ MainWindow::MainWindow(QWidget *parent)
     lrSpin->setValue(0.001);
 
     epochSpin = new QSpinBox();
-    epochSpin->setRange(1, 100000);
+    epochSpin->setRange(-1, 100000);
     epochSpin->setValue(10);
 
     {
@@ -443,6 +443,7 @@ void MainWindow::applyJsonToModel() {
     try {
         apply_json_to_model(json_, model_);
         modelApplied_ = true;
+        trainedEpochs_ = 0;
         QMessageBox::information(this, "提示", "模型已应用");
     } catch (const std::exception& e) {
         modelApplied_ = false;
@@ -752,6 +753,7 @@ void MainWindow::onLoadWeights() {
     }
     try {
         model_.loadWeights(path.toStdString());   // 结构与保存时不一致会 throw（key 不匹配）
+        trainedEpochs_ = 0;
         QMessageBox::information(this, "提示", "权重已导入");
     } catch (const std::exception& e) {
         QMessageBox::critical(this, "错误", e.what());
@@ -782,7 +784,7 @@ void MainWindow::onStart() {
     auto s = json_["input_shape"].toArray();
     int C = s[1].toInt(), H = s[2].toInt(), W = s[3].toInt();
 
-    worker = new TrainingWorker(&model_, &dataset_, C, H, W, aug_, currentDevice(),batchSpin->value(), epochSpin->value());
+    worker = new TrainingWorker(&model_, &dataset_, C, H, W, aug_, currentDevice(),batchSpin->value(), trainedEpochs_, epochSpin->value());
     thread = new QThread(this);
     worker->moveToThread(thread);
 
@@ -815,7 +817,10 @@ void MainWindow::onLoss(float loss) {
 }
 
 void MainWindow::onEpochDone(int epoch) {
-    datasetLabel->setText(QString("训练中：完成 epoch %1/%2").arg(epoch + 1).arg(epochSpin->value()));
+    trainedEpochs_ = epoch + 1;
+    int target = epochSpin->value();
+    QString t = (target < 0) ? QString::fromUtf8("∞") : QString::number(target);
+    datasetLabel->setText(QString("训练中：%1/%2").arg(trainedEpochs_).arg(t));
 }
 
 void MainWindow::onTrainingFinished() {

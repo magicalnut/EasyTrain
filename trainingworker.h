@@ -14,7 +14,7 @@ class TrainingWorker : public QObject
 {
     Q_OBJECT
 public:
-    TrainingWorker(Model* model, const Dataset* dataset, int C, int H, int W,AugConfig aug, torch::Device dev, int batch, int epochs);
+    TrainingWorker(Model* model, const Dataset* dataset, int C, int H, int W,AugConfig aug, torch::Device dev, int batch, int startEpoch, int targetEpoch);
     void run();
     void pause();
     void abort();
@@ -30,7 +30,7 @@ private:
     int C_, H_, W_;
     AugConfig aug_;
     torch::Device dev_;
-    int batch_, epochs_;
+    int batch_, startEpoch_, targetEpoch_;
     std::atomic<bool> pause_{false};
     std::atomic<bool> abort_{false};
 };

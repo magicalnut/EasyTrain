@@ -173,7 +173,8 @@ void Model::saveWeights(const std::string& path) const {
 }
 void Model::loadWeights(const std::string& path) {
     if (!impl_) throw std::runtime_error("loadWeights: 模型尚未 build");
-    torch::load(impl_, path);            // 要求当前结构与保存时一致，否则 key 不匹配 throw
+    torch::load(impl_, path);
+    optimizer_.reset();
 }
 
 void Model::prepareTraining() {

@@ -5,7 +5,7 @@
 #include <random>
 #include <vector>
 
-TrainingWorker::TrainingWorker(Model* model, const Dataset* dataset, int C, int H, int W,AugConfig aug, torch::Device dev, int batch, int epochs)
+TrainingWorker::TrainingWorker(Model* model, const Dataset* dataset, int C, int H, int W,AugConfig aug, torch::Device dev, int batch, int startEpoch, int targetEpoch)
     : model_(model)
     , dataset_(dataset)
     , C_(C)
@@ -13,8 +13,8 @@ TrainingWorker::TrainingWorker(Model* model, const Dataset* dataset, int C, int 
     , W_(W)
     , aug_(aug)
     , dev_(dev)
-    , batch_(batch)
-    , epochs_(epochs) {}
+    , startEpoch_(startEpoch)
+    , targetEpoch_(targetEpoch) {}
 
 void TrainingWorker::run() {
     model_->prepareTraining();
@@ -23,7 +23,8 @@ void TrainingWorker::run() {
     torch::nn::CrossEntropyLoss loss_fn;
     std::mt19937 rng(std::random_device{}());
 
-    for (int e = 0; e < epochs_; ++e) {
+    int e = startEpoch_;
+    while (targetEpoch_ < 0 || e < targetEpoch_) {
         if (pause_.load()){
             break;
         }
@@ -62,6 +63,7 @@ void TrainingWorker::run() {
 
         emit lossReady(static_cast<float>(total / std::max<int64_t>(seen, 1)));
         emit epochDone(e);
+        ++e;
     }
     emit finished();
 }
